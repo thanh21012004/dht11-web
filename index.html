@@ -163,8 +163,10 @@
             });
         }
 
-        // ================= XỬ LÝ DASHBOARD & 2 BIỂU ĐỒ =================
+ // ================= XỬ LÝ DASHBOARD & 2 BIỂU ĐỒ =================
         let tempChart, humChart;
+        let currentTemp = null;
+        let currentHum = null;
 
         function loadDashboardData() {
             // Khởi tạo Biểu đồ Nhiệt độ
@@ -187,48 +189,42 @@
                 });
             }
 
-            // Lắng nghe và cập nhật Nhiệt độ
+            // 1. Chỉ nhận dữ liệu mới từ Firebase và cập nhật số lớn
             onValue(ref(db, 'sensor/temperature'), (s) => {
-                let val = s.val();
-                if (val !== null) {
-                    document.getElementById('tempDisplay').innerText = val;
-                    const timeNow = new Date().toLocaleTimeString('vi-VN');
-                    tempChart.data.labels.push(timeNow);
-                    tempChart.data.datasets[0].data.push(val);
-                    if(tempChart.data.labels.length > 15) { tempChart.data.labels.shift(); tempChart.data.datasets[0].data.shift(); }
-                    tempChart.update();
+                if (s.val() !== null) {
+                    currentTemp = s.val();
+                    document.getElementById('tempDisplay').innerText = currentTemp;
                 }
             });
 
-            // Lắng nghe và cập nhật Độ ẩm
             onValue(ref(db, 'sensor/humidity'), (s) => {
-                let val = s.val();
-                if (val !== null) {
-                    document.getElementById('humDisplay').innerText = val;
-                    const timeNow = new Date().toLocaleTimeString('vi-VN');
-                    humChart.data.labels.push(timeNow);
-                    humChart.data.datasets[0].data.push(val);
-                    if(humChart.data.labels.length > 15) { humChart.data.labels.shift(); humChart.data.datasets[0].data.shift(); }
-                    humChart.update();
+                if (s.val() !== null) {
+                    currentHum = s.val();
+                    document.getElementById('humDisplay').innerText = currentHum;
                 }
             });
 
             onValue(ref(db, 'control/mode'), (s) => { if (s.val() !== null) updateModeUI(s.val()); });
+
+            // 2. ĐỒNG BỘ: Vẽ biểu đồ cùng lúc mỗi 5 giây
+            setInterval(() => {
+                if (currentTemp !== null && currentHum !== null) {
+                    const timeNow = new Date().toLocaleTimeString('vi-VN');
+
+                    // Cập nhật chart Nhiệt độ
+                    tempChart.data.labels.push(timeNow);
+                    tempChart.data.datasets[0].data.push(currentTemp);
+                    if(tempChart.data.labels.length > 15) { tempChart.data.labels.shift(); tempChart.data.datasets[0].data.shift(); }
+                    tempChart.update();
+
+                    // Cập nhật chart Độ ẩm
+                    humChart.data.labels.push(timeNow);
+                    humChart.data.datasets[0].data.push(currentHum);
+                    if(humChart.data.labels.length > 15) { humChart.data.labels.shift(); humChart.data.datasets[0].data.shift(); }
+                    humChart.update();
+                }
+            }, 5000);
         }
-
-        window.setMode = function(val) { set(ref(db, 'control/mode'), val); }
-        window.controlDevice = function(device, state) { set(ref(db, 'control/' + device), state); }
-
-        function updateModeUI(val) {
-            if(val === 0) {
-                document.getElementById('btnAuto').classList.replace('btn-outline-primary', 'btn-primary');
-                document.getElementById('btnManual').classList.replace('btn-secondary', 'btn-outline-secondary');
-            } else {
-                document.getElementById('btnAuto').classList.replace('btn-primary', 'btn-outline-primary');
-                document.getElementById('btnManual').classList.replace('btn-outline-secondary', 'btn-secondary');
-            }
-        }
-
         // ================= XUẤT FILE CSV =================
         window.exportCSV = function() {
             get(ref(db, 'history')).then((snapshot) => {
