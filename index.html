@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Smart Home - theshysadec2004</title>
+    
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getDatabase, ref, onValue, set } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
+
+        // Cấu hình Firebase mới của bạn
+        const firebaseConfig = {
+            apiKey: "AIzaSyAgEfUeAZ91etsTXtZqPa_y8o7ukA2aAxw",
+            authDomain: "dht11-firebase-9e9f4.firebaseapp.com",
+            projectId: "dht11-firebase-9e9f4",
+            storageBucket: "dht11-firebase-9e9f4.firebasestorage.app",
+            messagingSenderId: "1093281193502",
+            apiKey: "AIzaSyAgEfUeAZ91etsTXtZqPa_y8o7ukA2aAxw",
+            databaseURL: "https://dht11-firebase-9e9f4-default-rtdb.asia-southeast1.firebasedatabase.app"
+        };
+
+        // Khởi tạo Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+
+        // Lắng nghe dữ liệu cảm biến DHT11 Realtime
+        const tempRef = ref(db, 'sensor/temperature');
+        const humRef = ref(db, 'sensor/humidity');
+
+        onValue(tempRef, (snapshot) => {
+            const val = snapshot.val();
+            document.getElementById('tempDisplay').innerText = (val !== null ? val : "--") + " °C";
+        });
+
+        onValue(humRef, (snapshot) => {
+            const val = snapshot.val();
+            document.getElementById('humDisplay').innerText = (val !== null ? val : "--") + " %";
+        });
+
+        // Hàm điều khiển thiết bị
+        window.setMode = function(val) {
+            set(ref(db, 'control/mode'), val);
+            alert(val === 0 ? "Hệ thống đang chạy TỰ ĐỘNG (Auto)" : "Đã chuyển sang THỦ CÔNG (Manual)");
+        }
+
+        window.controlDevice = function(device, state) {
+            set(ref(db, 'control/' + device), state);
+        }
+    </script>
+
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; text-align: center; padding: 20px; background-color: #f4f7f6; }
+        h2 { color: #333; }
+        .card { background: white; border-radius: 12px; padding: 20px; margin: 15px auto; width: 320px; box-shadow: 0 4px 8px rgba(0,0,0,0.1); }
+        button { padding: 12px 20px; margin: 8px; cursor: pointer; border-radius: 8px; border: none; font-weight: bold; transition: 0.3s; }
+        button:hover { opacity: 0.8; }
+        .on { background-color: #4CAF50; color: white; }
+        .off { background-color: #f44336; color: white; }
+        .btn-mode { background-color: #2196F3; color: white; width: 45%; }
+        .value { color: #e91e63; font-size: 1.2em; }
+    </style>
+</head>
+<body>
+
+    <h2>Bảng Điều Khiển Nhà Thông Minh</h2>
+    
+    <div class="card">
+        <h3>Cảm Biến DHT11</h3>
+        <p>Nhiệt độ: <strong id="tempDisplay" class="value">-- °C</strong></p>
+        <p>Độ ẩm: <strong id="humDisplay" class="value">-- %</strong></p>
+    </div>
+
+    <div class="card">
+        <h3>Chế Độ Hoạt Động</h3>
+        <button class="btn-mode" onclick="setMode(0)">AUTO</button>
+        <button class="btn-mode" onclick="setMode(1)">MANUAL</button>
+        <p style="font-size: 0.85em; color: #666; margin-top: 10px;">(Auto: Tự bật còi & động cơ khi > 30°C hoặc < 5°C)</p>
+    </div>
+
+    <div class="card">
+        <h3>Điều Khiển Thủ Công</h3>
+        <p style="font-size: 0.85em; color: #ff9800;">(Chỉ hoạt động ở chế độ MANUAL)</p>
+        
+        <p><strong>Động cơ 12V (MOSFET)</strong></p>
+        <button class="on" onclick="controlDevice('motor', 1)">Bật Động Cơ</button>
+        <button class="off" onclick="controlDevice('motor', 0)">Tắt Động Cơ</button>
+
+        <p><strong>Còi Buzzer</strong></p>
+        <button class="on" onclick="controlDevice('buzzer', 1)">Bật Còi</button>
+        <button class="off" onclick="controlDevice('buzzer', 0)">Tắt Còi</button>
+    </div>
+
+</body>
+</html>
