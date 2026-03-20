@@ -7,13 +7,15 @@
     <title>Smart Home - theshysadec2004</title>
     
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getDatabase, ref, onValue, set, get, onDisconnect } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-database.js";
         import { getAuth, signInWithEmailAndPassword, createUserWithEmailAndPassword, sendPasswordResetEmail, sendEmailVerification, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
 
-        // CẤU HÌNH FIREBASE CỦA BẠN
+        // CẤU HÌNH FIREBASE
         const firebaseConfig = {
             apiKey: "AIzaSyAgEfUeAZ91etsTXtZqPa_y8o7ukA2aAxw",
             authDomain: "dht11-firebase-9e9f4.firebaseapp.com",
@@ -28,48 +30,57 @@
         const db = getDatabase(app);
         const auth = getAuth(app);
 
-        // ĐỊNH NGHĨA ADMIN
-        const ADMIN_EMAIL = "itsukashido2004@gmail.com"; // Đổi email admin của bạn ở đây
+        // ĐỊNH NGHĨA ADMIN (Hãy tự đăng ký tài khoản bằng email này trên giao diện)
+        const ADMIN_EMAIL = "itsukashido2004@gmail.com"; 
 
         // Các section giao diện
         const loginSection = document.getElementById('loginSection');
         const registerSection = document.getElementById('registerSection');
+        const forgotSection = document.getElementById('forgotSection');
         const dashboardSection = document.getElementById('dashboardSection');
         const adminSection = document.getElementById('adminSection');
 
-        // Hàm chuyển đổi màn hình (chuyển trang)
+        // Hàm chuyển trang
         window.showSection = function(sectionId) {
             loginSection.style.display = 'none';
             registerSection.style.display = 'none';
+            forgotSection.style.display = 'none';
             dashboardSection.style.display = 'none';
             adminSection.style.display = 'none';
             document.getElementById(sectionId).style.display = 'block';
         }
 
+        // Ẩn/Hiện mật khẩu
+        window.togglePassword = function(inputId, iconId) {
+            const input = document.getElementById(inputId);
+            const icon = document.getElementById(iconId);
+            if (input.type === "password") {
+                input.type = "text";
+                icon.classList.replace("bi-eye-slash", "bi-eye");
+            } else {
+                input.type = "password";
+                icon.classList.replace("bi-eye", "bi-eye-slash");
+            }
+        }
+
         // ================= XỬ LÝ TRẠNG THÁI ĐĂNG NHẬP =================
         onAuthStateChanged(auth, (user) => {
             if (user) {
-                // Kiểm tra xem đã kích hoạt email chưa (Ngoại trừ Admin có thể bỏ qua bước này nếu muốn)
                 if (!user.emailVerified) {
-                    alert("Tài khoản chưa được kích hoạt! Vui lòng kiểm tra hộp thư Email (kể cả thư rác) để nhấp vào link xác nhận.");
+                    alert("Tài khoản chưa được kích hoạt! Vui lòng kiểm tra email để xác nhận.");
                     signOut(auth);
                     return;
                 }
 
-                // PHÂN QUYỀN: Nếu là ADMIN
                 if (user.email === ADMIN_EMAIL) {
                     showSection('adminSection');
                     document.getElementById('adminUser').innerText = user.email;
                     loadAdminData();
-                } 
-                // PHÂN QUYỀN: Nếu là USER BÌNH THƯỜNG
-                else {
+                } else {
                     const activeUserRef = ref(db, 'system/active_user');
                     get(activeUserRef).then((snapshot) => {
                         const currentActiveUser = snapshot.val();
-                        
                         if (currentActiveUser === null || currentActiveUser === user.uid) {
-                            // Cấp quyền điều khiển
                             onDisconnect(activeUserRef).remove().then(() => {
                                 set(activeUserRef, user.uid);
                                 showSection('dashboardSection');
@@ -83,7 +94,7 @@
                     });
                 }
             } else {
-                showSection('loginSection'); // Chưa đăng nhập thì hiện form Login
+                showSection('loginSection');
             }
         });
 
@@ -92,9 +103,8 @@
             const email = document.getElementById('loginEmail').value;
             const pass = document.getElementById('loginPassword').value;
             const msg = document.getElementById('loginMsg');
-            
             signInWithEmailAndPassword(auth, email, pass)
-                .catch((error) => msg.innerHTML = `<span class="text-danger">Đăng nhập thất bại. Vui lòng kiểm tra lại!</span>`);
+                .catch(() => msg.innerHTML = `<span class="text-danger">Đăng nhập thất bại. Vui lòng kiểm tra lại!</span>`);
         }
 
         window.register = function() {
@@ -110,67 +120,101 @@
 
             createUserWithEmailAndPassword(auth, email, pass)
                 .then((userCredential) => {
-                    // Gửi email xác thực
                     sendEmailVerification(userCredential.user).then(() => {
-                        // Lưu thông tin vào DB để Admin có thể xem danh sách
                         set(ref(db, 'users/' + userCredential.user.uid), {
                             email: email,
                             register_time: new Date().toLocaleString()
                         });
-                        
-                        alert("Đăng ký thành công! Một email xác nhận đã được gửi đến " + email + ". Vui lòng nhấp vào link trong email để kích hoạt tài khoản trước khi đăng nhập.");
-                        signOut(auth); // Đăng xuất ép đi kích hoạt
+                        alert("Đăng ký thành công! Vui lòng vào hộp thư email của bạn để kích hoạt tài khoản.");
+                        signOut(auth); 
                         showSection('loginSection');
                     });
                 })
-                .catch((error) => msg.innerHTML = `<span class="text-danger">Lỗi: Email đã tồn tại hoặc mật khẩu quá ngắn.</span>`);
+                .catch(() => msg.innerHTML = `<span class="text-danger">Lỗi: Email đã tồn tại hoặc mật khẩu quá ngắn.</span>`);
         }
 
-        window.forgotPassword = function() {
-            const email = document.getElementById('loginEmail').value;
-            const msg = document.getElementById('loginMsg');
+        window.sendResetEmail = function() {
+            const email = document.getElementById('forgotEmail').value;
+            const msg = document.getElementById('forgotMsg');
             if (!email) {
-                msg.innerHTML = `<span class="text-danger">Vui lòng nhập Email vào ô trên rồi bấm Khôi phục!</span>`;
+                msg.innerHTML = `<span class="text-danger">Vui lòng nhập Email!</span>`;
                 return;
             }
             sendPasswordResetEmail(auth, email)
-                .then(() => msg.innerHTML = `<span class="text-success">Đã gửi link đặt lại mật khẩu vào Email của bạn!</span>`)
-                .catch((error) => msg.innerHTML = `<span class="text-danger">Lỗi: Email không tồn tại trong hệ thống.</span>`);
+                .then(() => msg.innerHTML = `<span class="text-success">Đã gửi hướng dẫn khôi phục vào Email của bạn!</span>`)
+                .catch(() => msg.innerHTML = `<span class="text-danger">Lỗi: Email không tồn tại trong hệ thống.</span>`);
         }
 
         window.logout = function() {
-            const activeUserRef = ref(db, 'system/active_user');
-            set(activeUserRef, null).then(() => {
-                signOut(auth);
-            });
+            set(ref(db, 'system/active_user'), null).then(() => signOut(auth));
         }
 
         // ================= XỬ LÝ ADMIN DASHBOARD =================
         function loadAdminData() {
-            const usersRef = ref(db, 'users');
-            onValue(usersRef, (snapshot) => {
+            onValue(ref(db, 'users'), (snapshot) => {
                 const tableBody = document.getElementById('userTableBody');
-                tableBody.innerHTML = ''; // Xóa bảng cũ
+                tableBody.innerHTML = ''; 
                 let stt = 1;
-                snapshot.forEach((childSnapshot) => {
-                    const data = childSnapshot.val();
-                    tableBody.innerHTML += `
-                        <tr>
-                            <td>${stt++}</td>
-                            <td class="fw-bold">${data.email}</td>
-                            <td>${data.register_time || 'Không rõ'}</td>
-                            <td><span class="badge bg-secondary">Mật khẩu đã mã hóa an toàn</span></td>
-                        </tr>
-                    `;
+                snapshot.forEach((child) => {
+                    const data = child.val();
+                    tableBody.innerHTML += `<tr>
+                        <td>${stt++}</td>
+                        <td class="fw-bold">${data.email}</td>
+                        <td>${data.register_time || 'Không rõ'}</td>
+                        <td><span class="badge bg-secondary">Đã mã hóa (Hashed)</span></td>
+                    </tr>`;
                 });
             });
         }
 
-        // ================= XỬ LÝ SMART HOME DASHBOARD =================
+        // ================= XỬ LÝ DASHBOARD & BIỂU ĐỒ =================
+        let sensorChart;
+
         function loadDashboardData() {
-            onValue(ref(db, 'sensor/temperature'), (s) => document.getElementById('tempDisplay').innerText = (s.val() !== null ? s.val() : "--"));
-            onValue(ref(db, 'sensor/humidity'), (s) => document.getElementById('humDisplay').innerText = (s.val() !== null ? s.val() : "--"));
+            // Khởi tạo biểu đồ nếu chưa có
+            if (!sensorChart) {
+                const ctx = document.getElementById('sensorChart').getContext('2d');
+                sensorChart = new Chart(ctx, {
+                    type: 'line',
+                    data: {
+                        labels: [],
+                        datasets: [
+                            { label: 'Nhiệt độ (°C)', borderColor: '#dc3545', backgroundColor: '#dc3545', data: [], tension: 0.3 },
+                            { label: 'Độ ẩm (%)', borderColor: '#0d6efd', backgroundColor: '#0d6efd', data: [], tension: 0.3 }
+                        ]
+                    },
+                    options: { responsive: true, animation: false, scales: { y: { beginAtZero: false } } }
+                });
+            }
+
+            // Lắng nghe realtime
+            onValue(ref(db, 'sensor/temperature'), (s) => {
+                let val = s.val();
+                document.getElementById('tempDisplay').innerText = (val !== null ? val : "--");
+                updateChart(0, val);
+            });
+            onValue(ref(db, 'sensor/humidity'), (s) => {
+                let val = s.val();
+                document.getElementById('humDisplay').innerText = (val !== null ? val : "--");
+                updateChart(1, val);
+            });
             onValue(ref(db, 'control/mode'), (s) => { if (s.val() !== null) updateModeUI(s.val()); });
+        }
+
+        function updateChart(datasetIndex, value) {
+            if (value === null) return;
+            const timeNow = new Date().toLocaleTimeString('vi-VN');
+            
+            // Cập nhật trục X khi nhận dữ liệu nhiệt độ (để đồng bộ)
+            if(datasetIndex === 0) {
+                sensorChart.data.labels.push(timeNow);
+                if(sensorChart.data.labels.length > 15) sensorChart.data.labels.shift(); // Chỉ giữ 15 điểm
+            }
+            
+            sensorChart.data.datasets[datasetIndex].data.push(value);
+            if(sensorChart.data.datasets[datasetIndex].data.length > 15) sensorChart.data.datasets[datasetIndex].data.shift();
+            
+            sensorChart.update();
         }
 
         window.setMode = function(val) { set(ref(db, 'control/mode'), val); }
@@ -185,51 +229,120 @@
                 document.getElementById('btnManual').classList.replace('btn-outline-secondary', 'btn-secondary');
             }
         }
+
+        // ================= XUẤT FILE CSV =================
+        window.exportCSV = function() {
+            get(ref(db, 'history')).then((snapshot) => {
+                if(!snapshot.exists()) {
+                    alert("Chưa có dữ liệu lịch sử để xuất!");
+                    return;
+                }
+                
+                // Tiêu đề cột chuẩn tiếng Việt
+                let csvContent = "THONG TIN XUAT DU LIEU HE THONG SMART HOME\n";
+                csvContent += "Trang web: theshysadec2004.id.vn\n";
+                csvContent += "Thoi gian xuat file: " + new Date().toLocaleString('vi-VN') + "\n\n";
+                csvContent += "Diem Do,Thoi Gian He Thong ESP32 (ms),Nhiet Do (°C),Do Am (%)\n";
+                
+                let counter = 1;
+                snapshot.forEach((child) => {
+                    let d = child.val();
+                    csvContent += `${counter},${d.time},${d.temp},${d.hum}\n`;
+                    counter++;
+                });
+
+                // Chuyển thành file tải về
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement("a");
+                link.href = URL.createObjectURL(blob);
+                link.download = "Lich_Su_Cam_Bien_SmartHome.csv";
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+            });
+        }
     </script>
 
     <style>
         body { background-color: #f8f9fa; font-family: 'Segoe UI', sans-serif; }
         .card { border-radius: 15px; border: none; }
-        /* Ẩn tất cả section trừ Login ban đầu */
-        #registerSection, #dashboardSection, #adminSection { display: none; }
+        #registerSection, #forgotSection, #dashboardSection, #adminSection { display: none; }
         .sensor-value { font-size: 2.5rem; font-weight: bold; color: #0d6efd; }
         .sensor-unit { font-size: 1.2rem; color: #6c757d; }
+        .input-group-text { cursor: pointer; }
     </style>
 </head>
 <body>
 
     <div id="loginSection" class="container py-5" style="max-width: 400px;">
-        <div class="card shadow p-4 text-center mt-5">
-            <h3 class="fw-bold mb-3 text-primary">Smart Home</h3>
-            <p class="text-muted small mb-4">Hệ thống cấp quyền sử dụng độc quyền</p>
+        <div class="card shadow p-4 mt-5">
+            <h3 class="fw-bold mb-3 text-primary text-center">Smart Home</h3>
+            <p class="text-muted small mb-4 text-center">Hệ thống cấp quyền sử dụng độc quyền</p>
             
             <input type="email" id="loginEmail" class="form-control mb-3" placeholder="Nhập Email">
-            <input type="password" id="loginPassword" class="form-control mb-3" placeholder="Nhập Mật khẩu">
             
-            <div id="loginMsg" class="mb-3 small fw-bold"></div>
+            <div class="input-group mb-3">
+                <input type="password" id="loginPassword" class="form-control" placeholder="Nhập Mật khẩu">
+                <span class="input-group-text bg-white" onclick="togglePassword('loginPassword', 'eyeLogin')">
+                    <i id="eyeLogin" class="bi bi-eye-slash text-muted"></i>
+                </span>
+            </div>
+            
+            <div id="loginMsg" class="mb-3 small fw-bold text-center"></div>
             
             <button class="btn btn-primary w-100 mb-2 fw-bold" onclick="login()">ĐĂNG NHẬP</button>
             <button class="btn btn-outline-secondary w-100 mb-3" onclick="showSection('registerSection')">TẠO TÀI KHOẢN MỚI</button>
             
-            <a href="#" class="text-decoration-none text-danger small" onclick="forgotPassword()">Bạn quên mật khẩu?</a>
+            <div class="text-center">
+                <a href="#" class="text-decoration-none text-danger small fw-bold" onclick="showSection('forgotSection')">Bạn quên mật khẩu? Nhấn vào đây</a>
+            </div>
         </div>
     </div>
 
     <div id="registerSection" class="container py-5" style="max-width: 400px;">
-        <div class="card shadow p-4 text-center mt-5">
-            <h3 class="fw-bold mb-3 text-success">Đăng Ký Tài Khoản</h3>
-            <p class="text-muted small mb-4">Email kích hoạt sẽ được gửi cho bạn</p>
+        <div class="card shadow p-4 mt-5">
+            <h3 class="fw-bold mb-3 text-success text-center">Đăng Ký Tài Khoản</h3>
+            <p class="text-muted small mb-4 text-center">Email kích hoạt sẽ được gửi cho bạn</p>
             
             <input type="email" id="regEmail" class="form-control mb-3" placeholder="Nhập Email của bạn">
-            <input type="password" id="regPassword" class="form-control mb-3" placeholder="Tạo Mật khẩu (Ít nhất 6 ký tự)">
-            <input type="password" id="regConfirmPassword" class="form-control mb-3" placeholder="Nhập lại Mật khẩu">
             
-            <div id="regMsg" class="mb-3 small fw-bold"></div>
+            <div class="input-group mb-3">
+                <input type="password" id="regPassword" class="form-control" placeholder="Tạo Mật khẩu (> 6 ký tự)">
+                <span class="input-group-text bg-white" onclick="togglePassword('regPassword', 'eyeReg1')">
+                    <i id="eyeReg1" class="bi bi-eye-slash text-muted"></i>
+                </span>
+            </div>
+
+            <div class="input-group mb-3">
+                <input type="password" id="regConfirmPassword" class="form-control" placeholder="Nhập lại Mật khẩu">
+                <span class="input-group-text bg-white" onclick="togglePassword('regConfirmPassword', 'eyeReg2')">
+                    <i id="eyeReg2" class="bi bi-eye-slash text-muted"></i>
+                </span>
+            </div>
+            
+            <div id="regMsg" class="mb-3 small fw-bold text-center"></div>
             
             <button class="btn btn-success w-100 mb-2 fw-bold" onclick="register()">ĐĂNG KÝ NGAY</button>
             
-            <div class="mt-3 small">
+            <div class="mt-3 small text-center">
                 Đã có tài khoản? <a href="#" class="text-decoration-none fw-bold" onclick="showSection('loginSection')">Quay lại Đăng nhập</a>
+            </div>
+        </div>
+    </div>
+
+    <div id="forgotSection" class="container py-5" style="max-width: 400px;">
+        <div class="card shadow p-4 mt-5">
+            <h3 class="fw-bold mb-3 text-danger text-center">Khôi Phục Mật Khẩu</h3>
+            <p class="text-muted small mb-4 text-center">Nhập email bạn đã đăng ký, chúng tôi sẽ gửi liên kết tạo mật khẩu mới.</p>
+            
+            <input type="email" id="forgotEmail" class="form-control mb-3" placeholder="Nhập Email của bạn">
+            
+            <div id="forgotMsg" class="mb-3 small fw-bold text-center"></div>
+            
+            <button class="btn btn-danger w-100 mb-2 fw-bold" onclick="sendResetEmail()">GỬI YÊU CẦU</button>
+            
+            <div class="mt-3 small text-center">
+                <a href="#" class="text-decoration-none fw-bold" onclick="showSection('loginSection')">Quay lại Đăng nhập</a>
             </div>
         </div>
     </div>
@@ -255,11 +368,10 @@
                             <th>STT</th>
                             <th>Email Người Dùng</th>
                             <th>Thời Gian Đăng Ký</th>
-                            <th>Mật Khẩu</th>
+                            <th>Trạng Thái Bảo Mật</th>
                         </tr>
                     </thead>
-                    <tbody id="userTableBody">
-                        </tbody>
+                    <tbody id="userTableBody"></tbody>
                 </table>
             </div>
         </div>
@@ -274,46 +386,50 @@
             </div>
         </div>
         
-        <div class="row justify-content-center g-4">
-            <div class="col-md-4">
-                <div class="card shadow-sm h-100 text-center">
+        <div class="row g-4">
+            <div class="col-lg-4 d-flex flex-column gap-4">
+                <div class="card shadow-sm text-center flex-fill">
                     <div class="card-header bg-primary text-white fw-bold">Cảm Biến DHT11</div>
                     <div class="card-body">
-                        <div class="mb-3 mt-3">
-                            <span id="tempDisplay" class="sensor-value">--</span><span class="sensor-unit">°C</span>
-                        </div>
+                        <div class="mb-3 mt-2"><span id="tempDisplay" class="sensor-value">--</span><span class="sensor-unit">°C</span></div>
                         <hr>
-                        <div class="mt-3">
-                            <span id="humDisplay" class="sensor-value">--</span><span class="sensor-unit">%</span>
-                        </div>
+                        <div class="mt-3"><span id="humDisplay" class="sensor-value">--</span><span class="sensor-unit">%</span></div>
                     </div>
                 </div>
-            </div>
 
-            <div class="col-md-4">
-                <div class="card shadow-sm h-100 text-center">
+                <div class="card shadow-sm text-center flex-fill">
                     <div class="card-header bg-dark text-white fw-bold">Chế Độ Hoạt Động</div>
-                    <div class="card-body mt-4">
-                        <button id="btnAuto" class="btn btn-primary w-100 mb-3 btn-lg" onclick="setMode(0)">AUTO</button>
-                        <button id="btnManual" class="btn btn-outline-secondary w-100 btn-lg" onclick="setMode(1)">MANUAL</button>
+                    <div class="card-body mt-2">
+                        <button id="btnAuto" class="btn btn-primary w-100 mb-2" onclick="setMode(0)">AUTO</button>
+                        <button id="btnManual" class="btn btn-outline-secondary w-100" onclick="setMode(1)">MANUAL</button>
+                    </div>
+                </div>
+
+                <div class="card shadow-sm text-center flex-fill">
+                    <div class="card-header bg-warning text-dark fw-bold">Điều Khiển Bằng Tay</div>
+                    <div class="card-body">
+                        <h6 class="fw-bold small">Quạt (MOSFET)</h6>
+                        <div class="btn-group w-100 mb-3">
+                            <button class="btn btn-success btn-sm" onclick="controlDevice('motor', 1)">BẬT</button>
+                            <button class="btn btn-danger btn-sm" onclick="controlDevice('motor', 0)">TẮT</button>
+                        </div>
+                        <h6 class="fw-bold small">Còi Báo Động</h6>
+                        <div class="btn-group w-100">
+                            <button class="btn btn-success btn-sm" onclick="controlDevice('buzzer', 1)">BẬT</button>
+                            <button class="btn btn-danger btn-sm" onclick="controlDevice('buzzer', 0)">TẮT</button>
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <div class="col-md-4">
-                <div class="card shadow-sm h-100 text-center">
-                    <div class="card-header bg-warning text-dark fw-bold">Điều Khiển Bằng Tay</div>
-                    <div class="card-body mt-2">
-                        <h6 class="fw-bold">Quạt (MOSFET)</h6>
-                        <div class="btn-group w-100 mb-4">
-                            <button class="btn btn-success" onclick="controlDevice('motor', 1)">BẬT</button>
-                            <button class="btn btn-danger" onclick="controlDevice('motor', 0)">TẮT</button>
-                        </div>
-                        <h6 class="fw-bold">Còi Báo Động</h6>
-                        <div class="btn-group w-100">
-                            <button class="btn btn-success" onclick="controlDevice('buzzer', 1)">BẬT</button>
-                            <button class="btn btn-danger" onclick="controlDevice('buzzer', 0)">TẮT</button>
-                        </div>
+            <div class="col-lg-8 d-flex flex-column gap-4">
+                <div class="card shadow-sm flex-fill">
+                    <div class="card-header bg-info text-white fw-bold d-flex justify-content-between align-items-center">
+                        <span>Biểu Đồ Theo Dõi Thời Gian Thực</span>
+                        <button class="btn btn-sm btn-light text-primary fw-bold" onclick="exportCSV()"><i class="bi bi-file-earmark-arrow-down-fill"></i> Xuất File CSV</button>
+                    </div>
+                    <div class="card-body">
+                        <canvas id="sensorChart" style="max-height: 450px;"></canvas>
                     </div>
                 </div>
             </div>
