@@ -225,6 +225,24 @@
                 }
             }, 5000);
         }
+        // ================= CÁC HÀM ĐIỀU KHIỂN NÚT BẤM (Đã được khôi phục) =================
+        window.setMode = function(val) { 
+            set(ref(db, 'control/mode'), val); 
+        }
+        
+        window.controlDevice = function(device, state) { 
+            set(ref(db, 'control/' + device), state); 
+        }
+
+        function updateModeUI(val) {
+            if(val === 0) {
+                document.getElementById('btnAuto').classList.replace('btn-outline-primary', 'btn-primary');
+                document.getElementById('btnManual').classList.replace('btn-secondary', 'btn-outline-secondary');
+            } else {
+                document.getElementById('btnAuto').classList.replace('btn-primary', 'btn-outline-primary');
+                document.getElementById('btnManual').classList.replace('btn-outline-secondary', 'btn-secondary');
+            }
+        }
         // ================= XUẤT FILE CSV =================
         window.exportCSV = function() {
             get(ref(db, 'history')).then((snapshot) => {
